@@ -37,8 +37,9 @@ const DEFAULT_STATE: StoredState = {
   preferences: { interval: 12, soundEnabled: true, volume: 42 },
 };
 
-function SplitFlapText({ text, announcementId }: { text: string; announcementId: string }) {
+function SplitFlapText({ text, previousText, announcementId }: { text: string; previousText: string; announcementId: string }) {
   let tileIndex = 0;
+  const previousCharacters = Array.from(previousText).filter((character) => !/\s/.test(character));
 
   return (
     <span className="flap-copy" aria-hidden="true">
@@ -46,13 +47,22 @@ function SplitFlapText({ text, announcementId }: { text: string; announcementId:
         <span className="flap-word" key={`${announcementId}-word-${wordIndex}`}>
           {Array.from(word).map((character) => {
             const index = tileIndex++;
+            const previousCharacter = previousCharacters[index] ?? ' ';
+            const topDelay = Math.min(index * 6, 360);
+            const bottomDelay = Math.min(topDelay + 120, 480);
             return (
               <span
                 className="flap-tile"
                 key={`${announcementId}-${index}-${character}`}
-                style={{ animationDelay: `${Math.min(index * 6, 360)}ms` }}
               >
-                <span>{character}</span>
+                <span className="flap-half flap-static flap-top"><span className="flap-glyph">{character}</span></span>
+                <span className="flap-half flap-static flap-bottom"><span className="flap-glyph">{character}</span></span>
+                <span className="flap-half flap-moving flap-top" style={{ animationDelay: `${topDelay}ms` }}>
+                  <span className="flap-glyph">{previousCharacter}</span>
+                </span>
+                <span className="flap-half flap-moving flap-bottom" style={{ animationDelay: `${bottomDelay}ms` }}>
+                  <span className="flap-glyph">{previousCharacter}</span>
+                </span>
               </span>
             );
           })}
@@ -86,13 +96,18 @@ function Home() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
+  const [transitionFromText, setTransitionFromText] = useState('');
   const appRef = useRef<HTMLElement>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const lastActiveId = useRef(activeId);
+  const lastActiveText = useRef('');
 
   const enabledMessages = useMemo(() => messages.filter((message) => message.enabled), [messages]);
   const activeMessage = enabledMessages.find((message) => message.id === activeId) ?? enabledMessages[0];
   const currentNumber = Math.max(0, enabledMessages.findIndex((message) => message.id === activeMessage?.id)) + 1;
+  const displayPreviousText = activeMessage?.id !== lastActiveId.current || activeMessage?.text !== lastActiveText.current
+    ? lastActiveText.current
+    : transitionFromText;
 
   useEffect(() => {
     try {
@@ -214,11 +229,15 @@ function Home() {
   }, [isPlaying, preferences.interval, enabledMessages.length]);
 
   useEffect(() => {
-    if (activeMessage?.id && activeMessage.id !== lastActiveId.current && preferences.soundEnabled && audioRef.current?.state === 'running') {
+    const messageChanged = activeMessage?.id !== lastActiveId.current;
+    const textChanged = activeMessage?.text !== lastActiveText.current;
+    if (messageChanged || textChanged) setTransitionFromText(lastActiveText.current);
+    if (messageChanged && activeMessage?.id && preferences.soundEnabled && audioRef.current?.state === 'running') {
       void playChime();
     }
     lastActiveId.current = activeMessage?.id ?? '';
-  }, [activeMessage?.id, playChime, preferences.soundEnabled]);
+    lastActiveText.current = activeMessage?.text ?? '';
+  }, [activeMessage?.id, activeMessage?.text, playChime, preferences.soundEnabled]);
 
   useEffect(() => {
     const onFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -338,17 +357,17 @@ function Home() {
       <div className="workspace">
         <section className="display-column" aria-label="Live ticker display">
           <section className="screen" aria-live="polite" aria-label="Announcement preview">
-            <div className="announcement-wrap" key={activeMessage?.id ?? 'empty'}>
+            <div className="announcement-wrap">
               {activeMessage ? (
                 <>
                   <div className="announcement-number">ANNOUNCEMENT {String(currentNumber).padStart(2, '0')} <span style={{ color: '#78818c' }}>/ {String(enabledMessages.length).padStart(2, '0')}</span></div>
-                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} announcementId={activeMessage.id} /></h2>
+                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} previousText={displayPreviousText} announcementId={activeMessage.id} /></h2>
                   <div className="screen-subline">Thank you for being here.</div>
                 </>
               ) : (
                 <>
                   <div className="announcement-number">READY WHEN YOU ARE</div>
-                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." announcementId="empty" /></h2>
+                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." previousText={displayPreviousText} announcementId="empty" /></h2>
                   <div className="screen-subline">Add a message to bring your display to life.</div>
                 </>
               )}

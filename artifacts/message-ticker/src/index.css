@@ -354,3 +354,50 @@ body { background:#000; }
   .flap-tile { min-width:.64em; }
   .admin-console { top:60px; left:10px; width:calc(100vw - 20px); max-height:calc(100dvh - 70px); padding:11px; }
 }
+
+/* Each character is two hinged flaps: top turns first, then bottom. */
+.flap-tile {
+  position:relative; display:inline-block; overflow:hidden; vertical-align:middle;
+  background:#fff; perspective:260px; transform:none; animation:none;
+}
+.flap-tile > .flap-half {
+  position:absolute; left:0; right:0; height:50%; overflow:hidden;
+  z-index:1; transform-style:preserve-3d; backface-visibility:hidden;
+}
+.flap-tile > .flap-half.flap-top { top:0; }
+.flap-tile > .flap-half.flap-bottom { top:50%; }
+.flap-half.flap-top { background:linear-gradient(180deg,#fff,#f2f2f2); }
+.flap-half.flap-bottom { background:linear-gradient(180deg,#e9e9e9,#fff); }
+.flap-tile > .flap-half.flap-moving {
+  z-index:4; will-change:transform; backface-visibility:hidden;
+}
+.flap-tile > .flap-half.flap-moving.flap-top {
+  z-index:5; transform-origin:50% 100%;
+  animation:split-flap-top .26s cubic-bezier(.2,.68,.3,1) both;
+  box-shadow:inset 0 -1px 1px #0004;
+}
+.flap-tile > .flap-half.flap-moving.flap-bottom {
+  transform-origin:50% 0%;
+  animation:split-flap-bottom .26s cubic-bezier(.2,.68,.3,1) both;
+  box-shadow:inset 0 1px 1px #0004;
+}
+.flap-half > .flap-glyph {
+  position:absolute; left:0; right:0; height:200%;
+  display:grid; place-items:center; color:#080808; font:inherit;
+  line-height:1; text-align:center;
+}
+.flap-half.flap-top > .flap-glyph { top:0; }
+.flap-half.flap-bottom > .flap-glyph { bottom:0; }
+.flap-tile:after { z-index:8; top:49.5%; height:1px; background:#777; opacity:.72; }
+@keyframes split-flap-top {
+  0% { transform:rotateX(0deg); filter:brightness(1); }
+  42% { transform:rotateX(-82deg); filter:brightness(.78); }
+  62% { transform:rotateX(-112deg); filter:brightness(.64); }
+  100% { transform:rotateX(-180deg); filter:brightness(.72); }
+}
+@keyframes split-flap-bottom {
+  0% { transform:rotateX(0deg); filter:brightness(1); }
+  42% { transform:rotateX(82deg); filter:brightness(.8); }
+  62% { transform:rotateX(112deg); filter:brightness(.68); }
+  100% { transform:rotateX(180deg); filter:brightness(.74); }
+}
