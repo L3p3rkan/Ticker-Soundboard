@@ -123,37 +123,73 @@ function Home() {
       setAudioReady(true);
       const now = context.currentTime;
       const volume = preferences.volume / 100;
-      const noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.045), context.sampleRate);
+      const noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.085), context.sampleRate);
       const samples = noise.getChannelData(0);
-      for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
-      Array.from({ length: 14 }, (_, index) => index * 0.062 + (index % 4 === 3 ? 0.035 : 0)).forEach((offset, index) => {
-        const start = now + offset;
-        const burst = context.createBufferSource();
-        const filter = context.createBiquadFilter();
-        const gain = context.createGain();
-        burst.buffer = noise;
-        filter.type = 'highpass';
-        filter.frequency.setValueAtTime(index % 2 === 0 ? 1450 : 820, start);
-        gain.gain.setValueAtTime(Math.max(0.0001, volume * (index % 2 === 0 ? 0.055 : 0.04)), start);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
-        burst.connect(filter);
-        filter.connect(gain);
-        gain.connect(context.destination);
-        burst.start(start);
-        burst.stop(start + 0.03);
+      let previousNoise = 0;
+      for (let i = 0; i < samples.length; i += 1) {
+        const white = Math.random() * 2 - 1;
+        previousNoise = white * 0.72 + previousNoise * 0.28;
+        samples[i] = previousNoise;
+      }
 
-        const knock = context.createOscillator();
-        const knockGain = context.createGain();
-        knock.type = 'triangle';
-        knock.frequency.setValueAtTime(index % 2 === 0 ? 205 : 145, start);
-        knock.frequency.exponentialRampToValueAtTime(68, start + 0.038);
-        knockGain.gain.setValueAtTime(Math.max(0.0001, volume * 0.045), start);
-        knockGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.045);
-        knock.connect(knockGain);
-        knockGain.connect(context.destination);
-        knock.start(start);
-        knock.stop(start + 0.05);
-      });
+      const addFlap = (start: number, strength: number) => {
+        const snap = context.createBufferSource();
+        const snapFilter = context.createBiquadFilter();
+        const snapGain = context.createGain();
+        snap.buffer = noise;
+        snapFilter.type = 'bandpass';
+        snapFilter.frequency.setValueAtTime(1150 + Math.random() * 1050, start);
+        snapFilter.Q.setValueAtTime(0.75 + Math.random() * 0.7, start);
+        snapGain.gain.setValueAtTime(0.0001, start);
+        snapGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume * 0.12 * strength), start + 0.002);
+        snapGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.025);
+        snap.connect(snapFilter);
+        snapFilter.connect(snapGain);
+        snapGain.connect(context.destination);
+        snap.start(start, Math.random() * 0.035, 0.026);
+        snap.stop(start + 0.028);
+
+        const body = context.createOscillator();
+        const bodyGain = context.createGain();
+        body.type = 'triangle';
+        body.frequency.setValueAtTime(175 + Math.random() * 75, start);
+        body.frequency.exponentialRampToValueAtTime(58 + Math.random() * 18, start + 0.048);
+        bodyGain.gain.setValueAtTime(0.0001, start);
+        bodyGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume * 0.085 * strength), start + 0.003);
+        bodyGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.052);
+        body.connect(bodyGain);
+        bodyGain.connect(context.destination);
+        body.start(start);
+        body.stop(start + 0.055);
+      };
+
+      const motor = context.createOscillator();
+      const motorFilter = context.createBiquadFilter();
+      const motorGain = context.createGain();
+      const motorEnd = 0.92;
+      motor.type = 'sawtooth';
+      motor.frequency.setValueAtTime(58, now);
+      motor.frequency.exponentialRampToValueAtTime(43, now + motorEnd);
+      motorFilter.type = 'lowpass';
+      motorFilter.frequency.setValueAtTime(170, now);
+      motorGain.gain.setValueAtTime(0.0001, now);
+      motorGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume * 0.012), now + 0.08);
+      motorGain.gain.setValueAtTime(Math.max(0.0002, volume * 0.012), now + 0.68);
+      motorGain.gain.exponentialRampToValueAtTime(0.0001, now + motorEnd);
+      motor.connect(motorFilter);
+      motorFilter.connect(motorGain);
+      motorGain.connect(context.destination);
+      motor.start(now);
+      motor.stop(now + motorEnd + 0.01);
+
+      let elapsed = 0.018;
+      for (let index = 0; index < 18; index += 1) {
+        const strength = 0.72 + Math.random() * 0.42;
+        addFlap(now + elapsed, strength);
+        if (index % 3 === 1 || index === 16) addFlap(now + elapsed + 0.021, strength * 0.58);
+        elapsed += 0.052 - Math.min(index, 12) * 0.0012 + Math.random() * 0.012;
+      }
+      addFlap(now + elapsed + 0.045, 1.18);
       return true;
     } catch {
       return false;
