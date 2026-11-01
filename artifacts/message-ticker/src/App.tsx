@@ -37,6 +37,31 @@ const DEFAULT_STATE: StoredState = {
   preferences: { interval: 12, soundEnabled: true, volume: 42 },
 };
 
+function SplitFlapText({ text, announcementId }: { text: string; announcementId: string }) {
+  let tileIndex = 0;
+
+  return (
+    <span className="flap-copy" aria-hidden="true">
+      {text.trim().split(/\s+/).filter(Boolean).map((word, wordIndex) => (
+        <span className="flap-word" key={`${announcementId}-word-${wordIndex}`}>
+          {Array.from(word).map((character) => {
+            const index = tileIndex++;
+            return (
+              <span
+                className="flap-tile"
+                key={`${announcementId}-${index}-${character}`}
+                style={{ animationDelay: `${Math.min(index % 18, 12) * 24}ms` }}
+              >
+                <span>{character}</span>
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function loadState(): StoredState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -97,19 +122,36 @@ function Home() {
       setAudioReady(true);
       const now = context.currentTime;
       const volume = preferences.volume / 100;
-      [740, 988].forEach((frequency, index) => {
-        const oscillator = context.createOscillator();
+      const noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.09), context.sampleRate);
+      const samples = noise.getChannelData(0);
+      for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
+      [0, 0.115, 0.29, 0.405].forEach((offset, index) => {
+        const start = now + offset;
+        const burst = context.createBufferSource();
+        const filter = context.createBiquadFilter();
         const gain = context.createGain();
-        const start = now + index * 0.105;
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(frequency, start);
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume * 0.085), start + 0.018);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.34);
-        oscillator.connect(gain);
+        burst.buffer = noise;
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(index % 2 === 0 ? 1250 : 760, start);
+        gain.gain.setValueAtTime(Math.max(0.0001, volume * (index % 2 === 0 ? 0.045 : 0.032)), start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.035);
+        burst.connect(filter);
+        filter.connect(gain);
         gain.connect(context.destination);
-        oscillator.start(start);
-        oscillator.stop(start + 0.36);
+        burst.start(start);
+        burst.stop(start + 0.04);
+
+        const knock = context.createOscillator();
+        const knockGain = context.createGain();
+        knock.type = 'triangle';
+        knock.frequency.setValueAtTime(index % 2 === 0 ? 190 : 135, start);
+        knock.frequency.exponentialRampToValueAtTime(72, start + 0.045);
+        knockGain.gain.setValueAtTime(Math.max(0.0001, volume * 0.035), start);
+        knockGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.055);
+        knock.connect(knockGain);
+        knockGain.connect(context.destination);
+        knock.start(start);
+        knock.stop(start + 0.06);
       });
       return true;
     } catch {
@@ -276,13 +318,13 @@ function Home() {
               {activeMessage ? (
                 <>
                   <div className="announcement-number">ANNOUNCEMENT {String(currentNumber).padStart(2, '0')} <span style={{ color: '#78818c' }}>/ {String(enabledMessages.length).padStart(2, '0')}</span></div>
-                  <h2 className="announcement">{activeMessage.text}</h2>
+                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} announcementId={activeMessage.id} /></h2>
                   <div className="screen-subline">Thank you for being here.</div>
                 </>
               ) : (
                 <>
                   <div className="announcement-number">READY WHEN YOU ARE</div>
-                  <h2 className="announcement">Your next announcement starts here.</h2>
+                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." announcementId="empty" /></h2>
                   <div className="screen-subline">Add a message to bring your display to life.</div>
                 </>
               )}
@@ -390,7 +432,7 @@ function Home() {
               <div className="setting-row sound-row">
                 <div>
                   <div className="setting-label">Announcement sound</div>
-                  <div className="setting-help">A soft chime when the message changes</div>
+                  <div className="setting-help">A quiet mechanical click-clack on change</div>
                 </div>
                 <button
                   className={`toggle${preferences.soundEnabled ? ' on' : ''}`}
