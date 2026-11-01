@@ -1,0 +1,1 @@
+- [Docker build compatibility](docker-build-compatibility.md) — pin pnpm 10 and use a glibc-based Node image for this workspace's Linux build.

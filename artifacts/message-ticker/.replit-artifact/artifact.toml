@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Message Ticker"
+description = "A full-screen message ticker for displaying rotating announcements with configurable timing and audible ticker cues, designed for self-hosting."
+version = "1.0.0"
+id = "artifacts/message-ticker"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20860
+
+[services.development]
+run = "pnpm --filter @workspace/message-ticker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/message-ticker", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/message-ticker/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20860"
+BASE_PATH = "/"
