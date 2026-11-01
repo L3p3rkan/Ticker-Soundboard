@@ -8,11 +8,11 @@ import {
   ChevronRight,
   CircleHelp,
   Maximize2,
+  Menu,
   Minimize2,
   Pause,
   Play,
   Plus,
-  Radio,
   RotateCcw,
   Settings2,
   Volume2,
@@ -50,7 +50,7 @@ function SplitFlapText({ text, announcementId }: { text: string; announcementId:
               <span
                 className="flap-tile"
                 key={`${announcementId}-${index}-${character}`}
-                style={{ animationDelay: `${Math.min(index % 18, 12) * 24}ms` }}
+                style={{ animationDelay: `${Math.min(index * 6, 360)}ms` }}
               >
                 <span>{character}</span>
               </span>
@@ -83,6 +83,7 @@ function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [adminOpen, setAdminOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const appRef = useRef<HTMLElement>(null);
@@ -122,36 +123,36 @@ function Home() {
       setAudioReady(true);
       const now = context.currentTime;
       const volume = preferences.volume / 100;
-      const noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.09), context.sampleRate);
+      const noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.045), context.sampleRate);
       const samples = noise.getChannelData(0);
       for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
-      [0, 0.115, 0.29, 0.405].forEach((offset, index) => {
+      Array.from({ length: 14 }, (_, index) => index * 0.062 + (index % 4 === 3 ? 0.035 : 0)).forEach((offset, index) => {
         const start = now + offset;
         const burst = context.createBufferSource();
         const filter = context.createBiquadFilter();
         const gain = context.createGain();
         burst.buffer = noise;
         filter.type = 'highpass';
-        filter.frequency.setValueAtTime(index % 2 === 0 ? 1250 : 760, start);
-        gain.gain.setValueAtTime(Math.max(0.0001, volume * (index % 2 === 0 ? 0.045 : 0.032)), start);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.035);
+        filter.frequency.setValueAtTime(index % 2 === 0 ? 1450 : 820, start);
+        gain.gain.setValueAtTime(Math.max(0.0001, volume * (index % 2 === 0 ? 0.055 : 0.04)), start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.026);
         burst.connect(filter);
         filter.connect(gain);
         gain.connect(context.destination);
         burst.start(start);
-        burst.stop(start + 0.04);
+        burst.stop(start + 0.03);
 
         const knock = context.createOscillator();
         const knockGain = context.createGain();
         knock.type = 'triangle';
-        knock.frequency.setValueAtTime(index % 2 === 0 ? 190 : 135, start);
-        knock.frequency.exponentialRampToValueAtTime(72, start + 0.045);
-        knockGain.gain.setValueAtTime(Math.max(0.0001, volume * 0.035), start);
-        knockGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.055);
+        knock.frequency.setValueAtTime(index % 2 === 0 ? 205 : 145, start);
+        knock.frequency.exponentialRampToValueAtTime(68, start + 0.038);
+        knockGain.gain.setValueAtTime(Math.max(0.0001, volume * 0.045), start);
+        knockGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.045);
         knock.connect(knockGain);
         knockGain.connect(context.destination);
         knock.start(start);
-        knock.stop(start + 0.06);
+        knock.stop(start + 0.05);
       });
       return true;
     } catch {
@@ -277,21 +278,21 @@ function Home() {
   return (
     <main className={`ticker-shell${isFullscreen ? ' fullscreen' : ''}`} ref={appRef}>
       <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true"><Radio size={19} strokeWidth={1.8} /></div>
-          <div>
-            <div className="brand-name">Ticker</div>
-            <div className="brand-caption">Public display system</div>
-          </div>
-        </div>
+        <button
+          className="admin-menu-button"
+          onClick={() => setAdminOpen((open) => !open)}
+          aria-label={adminOpen ? 'Close admin console' : 'Open admin console'}
+          aria-expanded={adminOpen}
+          aria-controls="admin-console"
+          data-testid="button-admin-menu"
+        >
+          {adminOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
         <div className="top-actions">
           <div className="top-status" role="status" data-testid="status-playback">
             <span className={`status-dot${isPlaying ? ' live' : ''}`} />
             {isPlaying ? 'ON AIR' : 'STANDING BY'}
           </div>
-          <button className="secondary-button" onClick={resetQueue} aria-label="Restore sample queue" data-testid="button-reset">
-            <RotateCcw size={14} /> <span>Reset</span>
-          </button>
           <button className="icon-button" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'} data-testid="button-fullscreen">
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
@@ -300,20 +301,7 @@ function Home() {
 
       <div className="workspace">
         <section className="display-column" aria-label="Live ticker display">
-          <div className="display-heading">
-            <div>
-              <div className="section-eyebrow">Your public display</div>
-              <h1>Live ticker</h1>
-              <p>What your guests see on screen.</p>
-            </div>
-            <span className="section-eyebrow">{enabledMessages.length} ACTIVE</span>
-          </div>
-
           <section className="screen" aria-live="polite" aria-label="Announcement preview">
-            <div className="screen-topline">
-              <div className="screen-kicker"><AlignLeft size={14} /> COMMUNITY BOARD</div>
-              <div className="live-pill"><span className="status-dot" /> {isPlaying ? 'Live rotation' : 'Preview'}</div>
-            </div>
             <div className="announcement-wrap" key={activeMessage?.id ?? 'empty'}>
               {activeMessage ? (
                 <>
@@ -329,30 +317,26 @@ function Home() {
                 </>
               )}
             </div>
-            <div className="screen-bottomline">
-              <span>RIVERSIDE COMMUNITY</span>
-              <span>{isPlaying ? `NEXT IN ${preferences.interval}s` : 'A PLACE TO GATHER'}</span>
-            </div>
-            <div className="progress-track"><div className="progress-fill" style={{ width: isPlaying ? '100%' : '0%' }} /></div>
           </section>
-
-          <div className="playback-bar">
-            <div className="transport">
-              <button className="icon-button" onClick={() => moveActive(-1)} disabled={!enabledMessages.length} aria-label="Previous announcement" data-testid="button-previous"><ChevronLeft size={19} /></button>
-              <button className="icon-button play-button" onClick={() => void togglePlayback()} disabled={!enabledMessages.length} aria-label={isPlaying ? 'Pause ticker' : 'Play ticker'} data-testid="button-play-pause">
-                {isPlaying ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" />}
-              </button>
-              <button className="icon-button" onClick={() => moveActive(1)} disabled={!enabledMessages.length} aria-label="Next announcement" data-testid="button-next"><ChevronRight size={19} /></button>
-            </div>
-            <div className="right-meta">
-              <div className="playing-label">{isPlaying ? 'Now circulating' : 'Ready to begin'}</div>
-              <div className="now-playing">{activeMessage?.text ?? 'No active announcement'}</div>
-            </div>
-          </div>
-          <p className="below-note">The ticker keeps running on this device, even when you step away.</p>
-          <div className="footer-note"><span>Stored on this device</span><span>Made for shared spaces</span></div>
         </section>
+      </div>
 
+      {adminOpen && (
+        <section className="admin-console" id="admin-console" aria-label="Admin console">
+          <div className="admin-console-header">
+            <div className="admin-console-title"><Settings2 size={15} /> Admin console</div>
+            <button className="secondary-button" onClick={resetQueue} aria-label="Restore sample queue" data-testid="button-reset">
+              <RotateCcw size={13} /> <span>Reset</span>
+            </button>
+          </div>
+          <div className="admin-transport">
+            <button className="icon-button" onClick={() => moveActive(-1)} disabled={!enabledMessages.length} aria-label="Previous announcement" data-testid="button-previous"><ChevronLeft size={19} /></button>
+            <button className="icon-button play-button" onClick={() => void togglePlayback()} disabled={!enabledMessages.length} aria-label={isPlaying ? 'Pause ticker' : 'Play ticker'} data-testid="button-play-pause">
+              {isPlaying ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" />}
+            </button>
+            <button className="icon-button" onClick={() => moveActive(1)} disabled={!enabledMessages.length} aria-label="Next announcement" data-testid="button-next"><ChevronRight size={19} /></button>
+            <span className="admin-playing-label">{isPlaying ? 'Ticker is rotating' : 'Ticker is paused'}</span>
+          </div>
         <aside className="control-column" aria-label="Ticker controls">
           <section className="panel">
             <div className="panel-header">
@@ -460,7 +444,8 @@ function Home() {
             </div>
           </section>
         </aside>
-      </div>
+        </section>
+      )}
     </main>
   );
 }
