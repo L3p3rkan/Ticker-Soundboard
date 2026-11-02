@@ -536,6 +536,7 @@ body, .ticker-shell { overflow:hidden; background:#000; }
 }
 .flap-copy {
   position:absolute; inset:0; display:grid; width:100%; height:100%;
+  align-items:stretch; justify-items:stretch;
   gap:1px; padding:0; overflow:hidden; background:#090909;
 }
 .flap-tile {
@@ -566,6 +567,7 @@ body, .ticker-shell { overflow:hidden; background:#000; }
   z-index:8; top:49.5%; height:1px; background:#050505;
   opacity:1; box-shadow:0 1px 0 #7775;
 }
+.fullscreen .announcement { font-size:clamp(10px,2.2vmin,28px); }
 .topbar { z-index:30; }
 .admin-menu-button, .top-actions .icon-button {
   background:#090909d9; border-color:#555; box-shadow:0 1px 5px #000;
@@ -573,7 +575,8 @@ body, .ticker-shell { overflow:hidden; background:#000; }
 .fullscreen .workspace, .fullscreen .screen { width:100vw; height:100dvh; min-height:100dvh; }
 @media(max-width:760px) {
   .workspace { padding:0; }
-  .announcement { font-size:clamp(10px,2.7vmin,18px); }
+  .announcement { font-size:clamp(12px,4vmin,18px); }
+  .fullscreen .announcement { font-size:clamp(12px,4vmin,18px); }
   .flap-copy { gap:1px; }
   .flap-tile { border-color:#242424; }
 }

@@ -38,19 +38,19 @@ const DEFAULT_STATE: StoredState = {
 };
 
 function wrapTextToGrid(text: string, columns: number, minimumRows: number) {
-  const lines: string[] = [];
-  let line = '';
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[][] = [];
+  let line: string[] = [];
+  const words = text.trim().split(/\s+/).filter(Boolean).map((word) => Array.from(word));
 
   for (const word of words) {
-    if (line && line.length + 1 + word.length <= columns) {
-      line += ` ${word}`;
+    if (line.length && line.length + 1 + word.length <= columns) {
+      line = [...line, ' ', ...word];
       continue;
     }
-    if (line) lines.push(line);
-    line = '';
+    if (line.length) lines.push(line);
+    line = [];
 
-    let remaining = word;
+    let remaining = [...word];
     while (remaining.length > columns) {
       lines.push(remaining.slice(0, columns));
       remaining = remaining.slice(columns);
@@ -58,10 +58,11 @@ function wrapTextToGrid(text: string, columns: number, minimumRows: number) {
     line = remaining;
   }
 
-  if (line || lines.length === 0) lines.push(line);
-  const rowCount = Math.max(minimumRows, lines.length);
+  if (line.length || lines.length === 0) lines.push(line);
+  const rowCount = Math.max(minimumRows, lines.length + 1);
   return Array.from({ length: rowCount * columns }, (_, index) => {
-    const row = lines[Math.floor(index / columns)] ?? '';
+    const rowIndex = Math.floor(index / columns) - 1;
+    const row = rowIndex >= 0 ? lines[rowIndex] ?? [] : [];
     return row[index % columns] ?? ' ';
   });
 }
@@ -91,11 +92,11 @@ function SplitFlapText({ text, previousText, announcementId, speed }: { text: st
   }, []);
 
   const cells = useMemo(
-    () => wrapTextToGrid(text, grid.columns, grid.rows),
+    () => wrapTextToGrid(text.toUpperCase(), grid.columns, grid.rows),
     [text, grid.columns, grid.rows],
   );
   const previousCells = useMemo(
-    () => wrapTextToGrid(previousText, grid.columns, grid.rows),
+    () => wrapTextToGrid(previousText.toUpperCase(), grid.columns, grid.rows),
     [previousText, grid.columns, grid.rows],
   );
   const rowCount = cells.length / grid.columns;
