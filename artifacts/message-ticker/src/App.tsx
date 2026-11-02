@@ -155,7 +155,7 @@ function Home() {
   const [saved, setSaved] = useState<StoredState>(loadState);
   const { messages, preferences } = saved;
   const [activeId, setActiveId] = useState(() => loadState().messages.find((item) => item.enabled)?.id ?? '');
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [adminOpen, setAdminOpen] = useState(false);
