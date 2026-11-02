@@ -23,7 +23,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
 type TickerMessage = { id: string; text: string; enabled: boolean };
-type Preferences = { interval: number; soundEnabled: boolean; volume: number };
+type Preferences = { interval: number; soundEnabled: boolean; volume: number; flipSpeed: number };
 type StoredState = { messages: TickerMessage[]; preferences: Preferences };
 
 const STORAGE_KEY = 'message-ticker-v1';
@@ -34,10 +34,10 @@ const DEFAULT_STATE: StoredState = {
     { id: 'm3', text: 'Refreshments are available in the courtyard. Please bring your cup back when finished.', enabled: true },
     { id: 'm4', text: 'A quiet room is available on the second floor if you need a moment to reset.', enabled: false },
   ],
-  preferences: { interval: 12, soundEnabled: true, volume: 42 },
+  preferences: { interval: 12, soundEnabled: true, volume: 42, flipSpeed: 1 },
 };
 
-function SplitFlapText({ text, previousText, announcementId }: { text: string; previousText: string; announcementId: string }) {
+function SplitFlapText({ text, previousText, announcementId, speed }: { text: string; previousText: string; announcementId: string; speed: number }) {
   let tileIndex = 0;
   const previousCharacters = Array.from(previousText).filter((character) => !/\s/.test(character));
 
@@ -48,8 +48,9 @@ function SplitFlapText({ text, previousText, announcementId }: { text: string; p
           {Array.from(word).map((character) => {
             const index = tileIndex++;
             const previousCharacter = previousCharacters[index] ?? ' ';
-            const topDelay = Math.min(index * 6, 360);
-            const bottomDelay = Math.min(topDelay + 120, 480);
+            const topDelay = Math.min(index * 6 / speed, 360 / speed);
+            const bottomDelay = Math.min(topDelay + 120 / speed, 480 / speed);
+            const flapDuration = `${260 / speed}ms`;
             return (
               <span
                 className="flap-tile"
@@ -57,10 +58,10 @@ function SplitFlapText({ text, previousText, announcementId }: { text: string; p
               >
                 <span className="flap-half flap-static flap-top"><span className="flap-glyph">{character}</span></span>
                 <span className="flap-half flap-static flap-bottom"><span className="flap-glyph">{character}</span></span>
-                <span className="flap-half flap-moving flap-top" style={{ animationDelay: `${topDelay}ms` }}>
+                <span className="flap-half flap-moving flap-top" style={{ animationDelay: `${topDelay}ms`, animationDuration: flapDuration }}>
                   <span className="flap-glyph">{previousCharacter}</span>
                 </span>
-                <span className="flap-half flap-moving flap-bottom" style={{ animationDelay: `${bottomDelay}ms` }}>
+                <span className="flap-half flap-moving flap-bottom" style={{ animationDelay: `${bottomDelay}ms`, animationDuration: flapDuration }}>
                   <span className="flap-glyph">{previousCharacter}</span>
                 </span>
               </span>
@@ -361,13 +362,13 @@ function Home() {
               {activeMessage ? (
                 <>
                   <div className="announcement-number">ANNOUNCEMENT {String(currentNumber).padStart(2, '0')} <span style={{ color: '#78818c' }}>/ {String(enabledMessages.length).padStart(2, '0')}</span></div>
-                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} previousText={displayPreviousText} announcementId={activeMessage.id} /></h2>
+                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} previousText={displayPreviousText} announcementId={activeMessage.id} speed={preferences.flipSpeed} /></h2>
                   <div className="screen-subline">Thank you for being here.</div>
                 </>
               ) : (
                 <>
                   <div className="announcement-number">READY WHEN YOU ARE</div>
-                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." previousText={displayPreviousText} announcementId="empty" /></h2>
+                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." previousText={displayPreviousText} announcementId="empty" speed={preferences.flipSpeed} /></h2>
                   <div className="screen-subline">Add a message to bring your display to life.</div>
                 </>
               )}
@@ -466,6 +467,28 @@ function Home() {
                   />
                   <span className="unit-label">SEC</span>
                 </div>
+              </div>
+
+              <div className="flip-speed-setting">
+                <div className="setting-row">
+                  <div>
+                    <div className="setting-label">Flip speed</div>
+                    <div className="setting-help">Adjust how quickly the panels turn</div>
+                  </div>
+                  <span className="speed-value">{preferences.flipSpeed.toFixed(1)}×</span>
+                </div>
+                <input
+                  className="flip-speed-slider"
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={preferences.flipSpeed}
+                  aria-label="Ticker flip speed"
+                  onChange={(event) => updatePreferences({ flipSpeed: Math.round(Number(event.target.value) * 10) / 10 })}
+                  data-testid="input-flip-speed"
+                />
+                <div className="speed-scale"><span>SLOW</span><span>FAST</span></div>
               </div>
 
               <div className="setting-row sound-row">
