@@ -112,9 +112,9 @@ function SplitFlapText({ text, previousText, announcementId, speed }: { text: st
     >
       {cells.map((character, index) => {
         const previousCharacter = previousCells[index] ?? ' ';
-        const topDelay = Math.min(index * 6 / speed, 360 / speed);
-        const bottomDelay = Math.min(topDelay + 120 / speed, 480 / speed);
         const flapDuration = `${260 / speed}ms`;
+        const topDelay = index * 4 / speed;
+        const bottomDelay = topDelay + 260 / speed;
         const glyph = character === ' ' ? '\u00a0' : character;
         const previousGlyph = previousCharacter === ' ' ? '\u00a0' : previousCharacter;
         return (
