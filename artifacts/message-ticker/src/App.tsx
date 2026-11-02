@@ -37,38 +37,101 @@ const DEFAULT_STATE: StoredState = {
   preferences: { interval: 12, soundEnabled: true, volume: 42, flipSpeed: 1 },
 };
 
+function wrapTextToGrid(text: string, columns: number, minimumRows: number) {
+  const lines: string[] = [];
+  let line = '';
+  const words = text.trim().split(/\s+/).filter(Boolean);
+
+  for (const word of words) {
+    if (line && line.length + 1 + word.length <= columns) {
+      line += ` ${word}`;
+      continue;
+    }
+    if (line) lines.push(line);
+    line = '';
+
+    let remaining = word;
+    while (remaining.length > columns) {
+      lines.push(remaining.slice(0, columns));
+      remaining = remaining.slice(columns);
+    }
+    line = remaining;
+  }
+
+  if (line || lines.length === 0) lines.push(line);
+  const rowCount = Math.max(minimumRows, lines.length);
+  return Array.from({ length: rowCount * columns }, (_, index) => {
+    const row = lines[Math.floor(index / columns)] ?? '';
+    return row[index % columns] ?? ' ';
+  });
+}
+
+function getFlapGridSize() {
+  const width = typeof window === 'undefined' ? 1440 : window.innerWidth;
+  const height = typeof window === 'undefined' ? 900 : window.innerHeight;
+  return {
+    columns: Math.max(8, Math.floor(width / 36)),
+    rows: Math.max(6, Math.floor(height / 58)),
+  };
+}
+
 function SplitFlapText({ text, previousText, announcementId, speed }: { text: string; previousText: string; announcementId: string; speed: number }) {
-  let tileIndex = 0;
-  const previousCharacters = Array.from(previousText).filter((character) => !/\s/.test(character));
+  const [grid, setGrid] = useState(getFlapGridSize);
+  useEffect(() => {
+    let frame = 0;
+    const resizeGrid = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setGrid(getFlapGridSize()));
+    };
+    window.addEventListener('resize', resizeGrid);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', resizeGrid);
+    };
+  }, []);
+
+  const cells = useMemo(
+    () => wrapTextToGrid(text, grid.columns, grid.rows),
+    [text, grid.columns, grid.rows],
+  );
+  const previousCells = useMemo(
+    () => wrapTextToGrid(previousText, grid.columns, grid.rows),
+    [previousText, grid.columns, grid.rows],
+  );
+  const rowCount = cells.length / grid.columns;
 
   return (
-    <span className="flap-copy" aria-hidden="true">
-      {text.trim().split(/\s+/).filter(Boolean).map((word, wordIndex) => (
-        <span className="flap-word" key={`${announcementId}-word-${wordIndex}`}>
-          {Array.from(word).map((character) => {
-            const index = tileIndex++;
-            const previousCharacter = previousCharacters[index] ?? ' ';
-            const topDelay = Math.min(index * 6 / speed, 360 / speed);
-            const bottomDelay = Math.min(topDelay + 120 / speed, 480 / speed);
-            const flapDuration = `${260 / speed}ms`;
-            return (
-              <span
-                className="flap-tile"
-                key={`${announcementId}-${index}-${character}`}
-              >
-                <span className="flap-half flap-static flap-top"><span className="flap-glyph">{character}</span></span>
-                <span className="flap-half flap-static flap-bottom"><span className="flap-glyph">{character}</span></span>
-                <span className="flap-half flap-moving flap-top" style={{ animationDelay: `${topDelay}ms`, animationDuration: flapDuration }}>
-                  <span className="flap-glyph">{previousCharacter}</span>
-                </span>
-                <span className="flap-half flap-moving flap-bottom" style={{ animationDelay: `${bottomDelay}ms`, animationDuration: flapDuration }}>
-                  <span className="flap-glyph">{previousCharacter}</span>
-                </span>
-              </span>
-            );
-          })}
-        </span>
-      ))}
+    <span
+      className="flap-copy"
+      style={{
+        gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${rowCount}, minmax(0, 1fr))`,
+      }}
+      aria-hidden="true"
+    >
+      {cells.map((character, index) => {
+        const previousCharacter = previousCells[index] ?? ' ';
+        const topDelay = Math.min(index * 6 / speed, 360 / speed);
+        const bottomDelay = Math.min(topDelay + 120 / speed, 480 / speed);
+        const flapDuration = `${260 / speed}ms`;
+        const glyph = character === ' ' ? '\u00a0' : character;
+        const previousGlyph = previousCharacter === ' ' ? '\u00a0' : previousCharacter;
+        return (
+          <span
+            className="flap-tile"
+            key={`${announcementId}-${index}-${character}`}
+          >
+            <span className="flap-half flap-static flap-top"><span className="flap-glyph">{glyph}</span></span>
+            <span className="flap-half flap-static flap-bottom"><span className="flap-glyph">{glyph}</span></span>
+            <span className="flap-half flap-moving flap-top" style={{ animationDelay: `${topDelay}ms`, animationDuration: flapDuration }}>
+              <span className="flap-glyph">{previousGlyph}</span>
+            </span>
+            <span className="flap-half flap-moving flap-bottom" style={{ animationDelay: `${bottomDelay}ms`, animationDuration: flapDuration }}>
+              <span className="flap-glyph">{previousGlyph}</span>
+            </span>
+          </span>
+        );
+      })}
     </span>
   );
 }
