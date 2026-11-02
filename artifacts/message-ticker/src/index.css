@@ -406,6 +406,13 @@ body { background:#000; }
 .flap-copy { column-gap:.352em; row-gap:.143em; }
 .flap-tile { margin:0 .0275em .0495em; }
 .flip-speed-setting { margin-top:15px; padding-top:14px; border-top:1px solid #333; }
+.message-position-setting { margin-top:15px; }
+.position-select {
+  min-width:122px; height:30px; padding:0 8px;
+  border:1px solid #454545; border-radius:2px;
+  color:#e0ddd3; background:#111; font-size:10px;
+}
+.position-select:hover { border-color:#777; background:#191919; }
 .speed-value { color:#e8e8e8; font:11px var(--app-font-mono); }
 .flip-speed-slider { display:block; width:100%; margin:12px 0 6px; accent-color:#d8b254; }
 .speed-scale { display:flex; justify-content:space-between; color:#77766f; font:8px var(--app-font-mono); letter-spacing:.12em; }

@@ -23,7 +23,8 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
 type TickerMessage = { id: string; text: string; enabled: boolean };
-type Preferences = { interval: number; soundEnabled: boolean; volume: number; flipSpeed: number };
+type MessagePosition = 'top' | 'center-left' | 'center';
+type Preferences = { interval: number; soundEnabled: boolean; volume: number; flipSpeed: number; messagePosition: MessagePosition };
 type StoredState = { messages: TickerMessage[]; preferences: Preferences };
 
 const STORAGE_KEY = 'message-ticker-v1';
@@ -34,10 +35,10 @@ const DEFAULT_STATE: StoredState = {
     { id: 'm3', text: 'Refreshments are available in the courtyard. Please bring your cup back when finished.', enabled: true },
     { id: 'm4', text: 'A quiet room is available on the second floor if you need a moment to reset.', enabled: false },
   ],
-  preferences: { interval: 12, soundEnabled: true, volume: 42, flipSpeed: 1 },
+  preferences: { interval: 12, soundEnabled: true, volume: 42, flipSpeed: 1, messagePosition: 'top' },
 };
 
-function wrapTextToGrid(text: string, columns: number, minimumRows: number) {
+function wrapTextToGrid(text: string, columns: number, minimumRows: number, position: MessagePosition) {
   const lines: string[][] = [];
   let line: string[] = [];
   const words = text.trim().split(/\s+/).filter(Boolean).map((word) => Array.from(word));
@@ -59,11 +60,16 @@ function wrapTextToGrid(text: string, columns: number, minimumRows: number) {
   }
 
   if (line.length || lines.length === 0) lines.push(line);
-  const rowCount = Math.max(minimumRows, lines.length + 1);
+  const topInset = position === 'top' ? 1 : 0;
+  const rowCount = Math.max(minimumRows, lines.length + topInset);
+  const firstTextRow = position === 'top'
+    ? topInset
+    : Math.max(0, Math.floor((rowCount - lines.length) / 2));
   return Array.from({ length: rowCount * columns }, (_, index) => {
-    const rowIndex = Math.floor(index / columns) - 1;
+    const rowIndex = Math.floor(index / columns) - firstTextRow;
     const row = rowIndex >= 0 ? lines[rowIndex] ?? [] : [];
-    return row[index % columns] ?? ' ';
+    const columnOffset = position === 'center' ? Math.max(0, Math.floor((columns - row.length) / 2)) : 0;
+    return row[index % columns - columnOffset] ?? ' ';
   });
 }
 
@@ -76,7 +82,7 @@ function getFlapGridSize() {
   };
 }
 
-function SplitFlapText({ text, previousText, announcementId, speed }: { text: string; previousText: string; announcementId: string; speed: number }) {
+function SplitFlapText({ text, previousText, announcementId, speed, position }: { text: string; previousText: string; announcementId: string; speed: number; position: MessagePosition }) {
   const [grid, setGrid] = useState(getFlapGridSize);
   useEffect(() => {
     let frame = 0;
@@ -92,12 +98,12 @@ function SplitFlapText({ text, previousText, announcementId, speed }: { text: st
   }, []);
 
   const cells = useMemo(
-    () => wrapTextToGrid(text.toUpperCase(), grid.columns, grid.rows),
-    [text, grid.columns, grid.rows],
+    () => wrapTextToGrid(text.toUpperCase(), grid.columns, grid.rows, position),
+    [text, grid.columns, grid.rows, position],
   );
   const previousCells = useMemo(
-    () => wrapTextToGrid(previousText.toUpperCase(), grid.columns, grid.rows),
-    [previousText, grid.columns, grid.rows],
+    () => wrapTextToGrid(previousText.toUpperCase(), grid.columns, grid.rows, position),
+    [previousText, grid.columns, grid.rows, position],
   );
   const rowCount = cells.length / grid.columns;
 
@@ -426,13 +432,13 @@ function Home() {
               {activeMessage ? (
                 <>
                   <div className="announcement-number">ANNOUNCEMENT {String(currentNumber).padStart(2, '0')} <span style={{ color: '#78818c' }}>/ {String(enabledMessages.length).padStart(2, '0')}</span></div>
-                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} previousText={displayPreviousText} announcementId={activeMessage.id} speed={preferences.flipSpeed} /></h2>
+                  <h2 className="announcement" aria-label={activeMessage.text}><SplitFlapText text={activeMessage.text} previousText={displayPreviousText} announcementId={activeMessage.id} speed={preferences.flipSpeed} position={preferences.messagePosition} /></h2>
                   <div className="screen-subline">Thank you for being here.</div>
                 </>
               ) : (
                 <>
                   <div className="announcement-number">READY WHEN YOU ARE</div>
-                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." previousText={displayPreviousText} announcementId="empty" speed={preferences.flipSpeed} /></h2>
+                  <h2 className="announcement" aria-label="Your next announcement starts here."><SplitFlapText text="Your next announcement starts here." previousText={displayPreviousText} announcementId="empty" speed={preferences.flipSpeed} position={preferences.messagePosition} /></h2>
                   <div className="screen-subline">Add a message to bring your display to life.</div>
                 </>
               )}
@@ -531,6 +537,25 @@ function Home() {
                   />
                   <span className="unit-label">SEC</span>
                 </div>
+              </div>
+
+              <div className="setting-row message-position-setting">
+                <div>
+                  <div className="setting-label">Message position</div>
+                  <div className="setting-help">Choose where the words sit on the board</div>
+                </div>
+                <select
+                  className="position-select"
+                  id="message-position"
+                  value={preferences.messagePosition}
+                  aria-label="Message position"
+                  onChange={(event) => updatePreferences({ messagePosition: event.target.value as MessagePosition })}
+                  data-testid="select-message-position"
+                >
+                  <option value="top">Top</option>
+                  <option value="center-left">Center Left</option>
+                  <option value="center">Center</option>
+                </select>
               </div>
 
               <div className="flip-speed-setting">
